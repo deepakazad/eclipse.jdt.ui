@@ -838,6 +838,81 @@ public class JavaHeuristicScannerTest extends TestCase {
 
     }
 
+	/*
+	 package snippet;
+
+	public class Snippet {
+
+	private boolean fPrime;
+
+	public boolean isPrime() {
+		return fPrime == true ? true
+				: false;
+	}
+	
+	public boolean isPrime1() {
+		return fPrime == true ? true
+				: false;
+	}
+
+	int foo(boolean a, boolean b, int c, int d) {
+		if (a)
+			return b ? c : d;
+		else
+			return 0;
+	}
+	
+	int foo1(boolean a, boolean b, int c, int d) {
+		if (a)
+			return b ? c() : d;
+		else
+			return 0;
+	}
+	private int c() {
+		return 0;
+	}
+
+	void bar() {
+		Object foo= null;
+		if (1 == 1)
+			foo= foo != null ? foo.toString() : null;
+		if (foo == null)
+			foo= new Object();
+	}
+	
+	public static int formaterror1() {
+		int size = 0 < 10 ?
+				(int)10.0 :
+				20;
+		return size;
+	}
+
+
+	public static int formaterror2() {
+		int size = 0 < 10 ?
+				(int)10.0 : 20;
+		return size;
+	}
+
+	//this case is fixed
+	public static int formaterror3() {
+		int size = 0 < 10 ?
+				10 :
+				20;
+		return size;
+	}
+
+	public static int formaterror4() {
+		int size = 0 < 10
+				? 10
+				: 20;
+		return size;
+	}
+
+	}
+	  
+	 */
+
 	public void testContinuationIndentationOfForStatement() throws Exception {
 		fDocument.set("\tfor (int i = (2 * 2); i < array.length; i++) {\n" +
 				"\tint i= 25;\n" +

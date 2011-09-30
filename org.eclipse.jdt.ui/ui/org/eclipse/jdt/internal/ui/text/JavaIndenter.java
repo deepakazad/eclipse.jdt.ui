@@ -1037,8 +1037,20 @@ public final class JavaIndenter {
 
 			case Symbols.TokenCOLON:
 				// TODO handle ternary deep indentation
-				fIndent= fPrefs.prefCaseBlockIndent;
-				return fPosition;
+				if (!isConditional()) {
+					fIndent= fPrefs.prefCaseBlockIndent;
+					return fPosition;
+				} else {
+					if (fPrefs.prefTernaryDeepAlign) {
+						setFirstElementAlignment(fPosition, offset + 1);
+						return fPosition;
+					} else {
+						fIndent= fPrefs.prefTernaryIndent;
+						return fPosition;
+					}
+				}
+				/*fIndent= fPrefs.prefCaseBlockIndent;
+				return fPosition;*/
 
 			case Symbols.TokenQUESTIONMARK:
 				if (fPrefs.prefTernaryDeepAlign) {
@@ -1487,7 +1499,8 @@ public final class JavaIndenter {
 						setFirstElementAlignment(fPosition - 1, fPosition + 1);
 						return fPosition;
 					} else {
-						fIndent= fPrefs.prefTernaryIndent;
+						//fIndent= fPrefs.prefTernaryIndent;
+						fIndent= 0;
 						return fPosition;
 					}
 				case Symbols.TokenRETURN:
