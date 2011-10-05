@@ -401,6 +401,22 @@ public interface IJavaEditorActionDefinitionIds extends ITextEditorActionDefinit
 	public static final String EXTRACT_METHOD= "org.eclipse.jdt.ui.edit.text.java.extract.method"; //$NON-NLS-1$
 
 	/**
+	 * Action definition ID of the refactor -> find duplicates action (value
+	 * <code>"org.eclipse.jdt.ui.edit.text.java.find.duplicates"</code>).
+	 * 
+	 * @since 3.8
+	 */
+	public static final String FIND_DUPLICATES= "org.eclipse.jdt.ui.edit.text.java.find.duplicates"; //$NON-NLS-1$
+
+	/**
+	 * Action definition ID of the refactor -> search snippet action (value
+	 * <code>"org.eclipse.jdt.ui.edit.text.java.search.snippet"</code>).
+	 * 
+	 * @since 3.8
+	 */
+	public static final String SEARCH_SNIPPET= "org.eclipse.jdt.ui.edit.text.java.search.snippet"; //$NON-NLS-1$
+
+	/**
 	 * Action definition ID of the refactor -> inline action
 	 * (value <code>"org.eclipse.jdt.ui.edit.text.java.inline"</code>).
 	 *

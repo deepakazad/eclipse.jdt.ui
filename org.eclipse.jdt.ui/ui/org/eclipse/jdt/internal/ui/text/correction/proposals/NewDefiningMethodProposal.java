@@ -23,6 +23,7 @@ import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.IExtendedModifier;
 import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.Modifier;
 import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.SimpleName;
@@ -40,12 +41,16 @@ import org.eclipse.jdt.internal.ui.viewsupport.JavaElementImageProvider;
 
 public class NewDefiningMethodProposal extends AbstractMethodCorrectionProposal {
 
-	private final IMethodBinding fMethod;
+	private final IMethodBinding fMethodBinding;
 	private final String[] fParamNames;
 
-	public NewDefiningMethodProposal(String label, ICompilationUnit targetCU, ASTNode invocationNode, ITypeBinding binding, IMethodBinding method, String[] paramNames, int relevance) {
+	private final MethodDeclaration fMethodDecl;
+
+	public NewDefiningMethodProposal(String label, ICompilationUnit targetCU, ASTNode invocationNode, ITypeBinding binding, IMethodBinding method, MethodDeclaration decl, String[] paramNames,
+			int relevance) {
 		super(label,targetCU,invocationNode,binding,relevance,null);
-		fMethod= method;
+		fMethodBinding= method;
+		fMethodDecl= decl;
 		fParamNames= paramNames;
 
 		ImageDescriptor desc= JavaElementImageProvider.getMethodImageDescriptor(binding.isInterface() || binding.isAnnotation(), method.getModifiers());
@@ -57,7 +62,7 @@ public class NewDefiningMethodProposal extends AbstractMethodCorrectionProposal 
 	 */
 	@Override
 	protected boolean isConstructor() {
-		return fMethod.isConstructor();
+		return fMethodBinding.isConstructor();
 	}
 
 	/* (non-Javadoc)
@@ -67,13 +72,16 @@ public class NewDefiningMethodProposal extends AbstractMethodCorrectionProposal 
 	protected void addNewParameters(ASTRewrite rewrite, List<String> takenNames, List<SingleVariableDeclaration> params) throws CoreException {
 		AST ast= rewrite.getAST();
 		ImportRewrite importRewrite= getImportRewrite();
-		ITypeBinding[] bindings= fMethod.getParameterTypes();
+		ITypeBinding[] bindings= fMethodBinding.getParameterTypes();
 
 		IJavaProject project= getCompilationUnit().getJavaProject();
 		String[][] paramNames= StubUtility.suggestArgumentNamesWithProposals(project, fParamNames);
 
+		List parameters= fMethodDecl.parameters();
 		for (int i= 0; i < bindings.length; i++) {
 			ITypeBinding curr= bindings[i];
+			SingleVariableDeclaration var= (SingleVariableDeclaration) parameters.get(i);
+			var.isVarargs();
 
 			String[] proposedNames= paramNames[i];
 
@@ -99,7 +107,7 @@ public class NewDefiningMethodProposal extends AbstractMethodCorrectionProposal 
 	@Override
 	protected SimpleName getNewName(ASTRewrite rewrite) {
 		AST ast= rewrite.getAST();
-		SimpleName nameNode= ast.newSimpleName(fMethod.getName());
+		SimpleName nameNode= ast.newSimpleName(fMethodBinding.getName());
 		return nameNode;
 	}
 
@@ -107,7 +115,7 @@ public class NewDefiningMethodProposal extends AbstractMethodCorrectionProposal 
 		if (getSenderBinding().isInterface()) {
 			return 0;
 		} else {
-			int modifiers= fMethod.getModifiers();
+			int modifiers= fMethodBinding.getModifiers();
 			if (Modifier.isPrivate(modifiers)) {
 				modifiers |= Modifier.PROTECTED;
 			}
@@ -128,7 +136,7 @@ public class NewDefiningMethodProposal extends AbstractMethodCorrectionProposal 
 	 */
 	@Override
 	protected Type getNewMethodType(ASTRewrite rewrite) throws CoreException {
-		return getImportRewrite().addImport(fMethod.getReturnType(), rewrite.getAST());
+		return getImportRewrite().addImport(fMethodBinding.getReturnType(), rewrite.getAST());
 	}
 
 	/* (non-Javadoc)
@@ -138,7 +146,7 @@ public class NewDefiningMethodProposal extends AbstractMethodCorrectionProposal 
 	protected void addNewExceptions(ASTRewrite rewrite, List<Name> exceptions) throws CoreException {
 		AST ast= rewrite.getAST();
 		ImportRewrite importRewrite= getImportRewrite();
-		ITypeBinding[] bindings= fMethod.getExceptionTypes();
+		ITypeBinding[] bindings= fMethodBinding.getExceptionTypes();
 		for (int i= 0; i < bindings.length; i++) {
 			String typeName= importRewrite.addImport(bindings[i]);
 			Name newNode= ASTNodeFactory.newName(ast, typeName);

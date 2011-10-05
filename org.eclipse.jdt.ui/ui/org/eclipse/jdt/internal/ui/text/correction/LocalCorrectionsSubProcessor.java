@@ -460,6 +460,7 @@ public class LocalCorrectionsSubProcessor {
 		}
 
 		QuickAssistProcessor.getCatchClauseToThrowsProposals(context, selectedNode, proposals);
+		QuickAssistProcessor.getPickoutTypeFromMulticatchProposals(context, selectedNode, new ArrayList<ASTNode>(), proposals);
 	}
 
 	public static void addNLSProposals(IInvocationContext context, IProblemLocation problem, Collection<ICommandAccess> proposals) throws CoreException {

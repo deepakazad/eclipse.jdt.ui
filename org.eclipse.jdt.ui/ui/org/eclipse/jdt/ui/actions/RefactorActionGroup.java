@@ -166,6 +166,9 @@ public class RefactorActionGroup extends ActionGroup {
 //	private SelectionDispatchAction fReplaceInvocationsAction;
 	private SelectionDispatchAction fIntroduceIndirectionAction;
 	private SelectionDispatchAction fExtractMethodAction;
+	private SelectionDispatchAction fFindDuplicatesAction;
+
+	private SelectionDispatchAction fSearchSnippetAction;
 	private SelectionDispatchAction fExtractTempAction;
 	private SelectionDispatchAction fExtractConstantAction;
 	private SelectionDispatchAction fExtractClassAction;
@@ -297,6 +300,14 @@ public class RefactorActionGroup extends ActionGroup {
 			fExtractMethodAction= new ExtractMethodAction(editor);
 			initUpdatingAction(fExtractMethodAction, provider, null, selection, IJavaEditorActionDefinitionIds.EXTRACT_METHOD);
 			editor.setAction("ExtractMethod", fExtractMethodAction); //$NON-NLS-1$
+
+			fFindDuplicatesAction= new FindDuplicatesAction(editor);
+			initUpdatingAction(fFindDuplicatesAction, provider, null, selection, IJavaEditorActionDefinitionIds.FIND_DUPLICATES);
+			editor.setAction("FindDuplicates", fFindDuplicatesAction); //$NON-NLS-1$
+
+			fSearchSnippetAction= new SearchSnippetAction(editor);
+			initUpdatingAction(fSearchSnippetAction, provider, null, selection, IJavaEditorActionDefinitionIds.SEARCH_SNIPPET);
+			editor.setAction("SearchSnippet", fSearchSnippetAction); //$NON-NLS-1$
 
 			fExtractTempAction= new ExtractTempAction(editor);
 			initUpdatingAction(fExtractTempAction, provider, null, selection, IJavaEditorActionDefinitionIds.EXTRACT_LOCAL_VARIABLE);
@@ -447,11 +458,11 @@ public class RefactorActionGroup extends ActionGroup {
 	 * Sets actionDefinitionId, updates enablement, adds to fActions,
 	 * and adds selection changed listener if provider is not <code>null</code>.
 	 *
-	 * @param action the action 
+	 * @param action the action
 	 * @param provider can be <code>null</code>
 	 * @param specialProvider a special selection provider or <code>null</code>
 	 * @param selection the selection
-	 * @param actionDefinitionId the action definition id 
+	 * @param actionDefinitionId the action definition id
 	 */
 	private void initUpdatingAction(SelectionDispatchAction action, ISelectionProvider provider, ISelectionProvider specialProvider, ISelection selection, String actionDefinitionId) {
 		action.setActionDefinitionId(actionDefinitionId);
@@ -481,6 +492,8 @@ public class RefactorActionGroup extends ActionGroup {
 			actionBars.setGlobalActionHandler(JdtActionConstants.INTRODUCE_PARAMETER, fIntroduceParameterAction);
 			actionBars.setGlobalActionHandler(JdtActionConstants.INTRODUCE_FACTORY, fIntroduceFactoryAction);
 			actionBars.setGlobalActionHandler(JdtActionConstants.EXTRACT_METHOD, fExtractMethodAction);
+			actionBars.setGlobalActionHandler(JdtActionConstants.FIND_DUPLICATES, fFindDuplicatesAction);
+			actionBars.setGlobalActionHandler(JdtActionConstants.SEARCH_SNIPPET, fSearchSnippetAction);
 			//	actionBars.setGlobalActionHandler(JdtActionConstants.REPLACE_INVOCATIONS, fReplaceInvocationsAction);
 			actionBars.setGlobalActionHandler(JdtActionConstants.EXTRACT_INTERFACE, fExtractInterfaceAction);
 			actionBars.setGlobalActionHandler(JdtActionConstants.EXTRACT_CLASS, fExtractClassAction);
@@ -537,6 +550,8 @@ public class RefactorActionGroup extends ActionGroup {
 			disposeAction(fIntroduceParameterObjectAction, fSelectionProvider);
 			disposeAction(fIntroduceFactoryAction, fSelectionProvider);
 			disposeAction(fExtractMethodAction, fSelectionProvider);
+			disposeAction(fFindDuplicatesAction, fSelectionProvider);
+			disposeAction(fSearchSnippetAction, fSelectionProvider);
 			//	disposeAction(fReplaceInvocationsAction, provider);
 			disposeAction(fExtractInterfaceAction, fSelectionProvider);
 			disposeAction(fExtractClassAction, fSelectionProvider);
@@ -596,6 +611,8 @@ public class RefactorActionGroup extends ActionGroup {
 		refactorSubmenu.add(new Separator(GROUP_CODING));
 		added+= addAction(refactorSubmenu, fModifyParametersAction);
 		added+= addAction(refactorSubmenu, fExtractMethodAction);
+		added+= addAction(refactorSubmenu, fFindDuplicatesAction);
+		added+= addAction(refactorSubmenu, fSearchSnippetAction);
 		added+= addAction(refactorSubmenu, fExtractTempAction);
 		added+= addAction(refactorSubmenu, fExtractConstantAction);
 		added+= addAction(refactorSubmenu, fInlineAction);

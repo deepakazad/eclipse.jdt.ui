@@ -46,6 +46,7 @@ import org.eclipse.jdt.core.NamingConventions;
 import org.eclipse.jdt.core.compiler.IProblem;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.ASTVisitor;
 import org.eclipse.jdt.core.dom.AnonymousClassDeclaration;
 import org.eclipse.jdt.core.dom.ArrayAccess;
 import org.eclipse.jdt.core.dom.ArrayCreation;
@@ -82,6 +83,7 @@ import org.eclipse.jdt.core.dom.ParameterizedType;
 import org.eclipse.jdt.core.dom.ParenthesizedExpression;
 import org.eclipse.jdt.core.dom.PostfixExpression;
 import org.eclipse.jdt.core.dom.PrimitiveType;
+import org.eclipse.jdt.core.dom.ReturnStatement;
 import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.SimpleType;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
@@ -111,6 +113,7 @@ import org.eclipse.jdt.internal.corext.codemanipulation.StubUtility;
 import org.eclipse.jdt.internal.corext.dom.ASTNodeFactory;
 import org.eclipse.jdt.internal.corext.dom.ASTNodes;
 import org.eclipse.jdt.internal.corext.dom.Bindings;
+import org.eclipse.jdt.internal.corext.dom.GenericVisitor;
 import org.eclipse.jdt.internal.corext.dom.LinkedNodeFinder;
 import org.eclipse.jdt.internal.corext.dom.ModifierRewrite;
 import org.eclipse.jdt.internal.corext.dom.Selection;
@@ -188,8 +191,9 @@ public class QuickAssistProcessor implements IQuickAssistProcessor {
 			ArrayList<ASTNode> coveredNodes= AdvancedQuickAssistProcessor.getFullyCoveredNodes(context, coveringNode);
 			return getCatchClauseToThrowsProposals(context, coveringNode, null)
 				|| getPickoutTypeFromMulticatchProposals(context, coveringNode, coveredNodes, null)
-				|| getConvertToMultiCatchProposals(context, coveringNode, null)
+				|| getConvertToMultiCatchProposals(context, coveringNode, coveredNodes, null)
 				|| getUnrollMultiCatchProposals(context, coveringNode, null)
+				|| getTryWithResourcesProposals(context, coveringNode, null)
 				|| getRenameLocalProposals(context, coveringNode, null, null)
 				|| getRenameRefactoringProposal(context, coveringNode, null, null)
 				|| getAssignToVariableProposals(context, coveringNode, null, null)
@@ -238,8 +242,9 @@ public class QuickAssistProcessor implements IQuickAssistProcessor {
 				boolean problemsAtLocation= locations.length != 0;
 				getCatchClauseToThrowsProposals(context, coveringNode, resultingCollections);
 				getPickoutTypeFromMulticatchProposals(context, coveringNode, coveredNodes, resultingCollections);
-				getConvertToMultiCatchProposals(context, coveringNode, resultingCollections);
+				getConvertToMultiCatchProposals(context, coveringNode, coveredNodes, resultingCollections);
 				getUnrollMultiCatchProposals(context, coveringNode, resultingCollections);
+				getTryWithResourcesProposals(context, coveringNode, resultingCollections);
 				getUnWrapProposals(context, coveringNode, resultingCollections);
 				getJoinVariableProposals(context, coveringNode, resultingCollections);
 				getSplitVariableProposals(context, coveringNode, resultingCollections);
@@ -1387,7 +1392,7 @@ public class QuickAssistProcessor implements IQuickAssistProcessor {
 		return true;
 	}
 
-	private static boolean getPickoutTypeFromMulticatchProposals(IInvocationContext context, ASTNode node, ArrayList<ASTNode> coveredNodes, Collection<ICommandAccess> resultingCollections) {
+	public static boolean getPickoutTypeFromMulticatchProposals(IInvocationContext context, ASTNode node, ArrayList<ASTNode> coveredNodes, Collection<ICommandAccess> resultingCollections) {
 		CatchClause catchClause= (CatchClause) ASTResolving.findAncestor(node, ASTNode.CATCH_CLAUSE);
 		if (catchClause == null) {
 			return false;
@@ -1461,35 +1466,48 @@ public class QuickAssistProcessor implements IQuickAssistProcessor {
 		return true;
 	}
 
-	private static boolean getConvertToMultiCatchProposals(IInvocationContext context, ASTNode covering, Collection<ICommandAccess> resultingCollections) {
+	private static boolean getConvertToMultiCatchProposals(IInvocationContext context, ASTNode covering, List<ASTNode> coveredNodes, Collection<ICommandAccess> resultingCollections) {
 		if (!JavaModelUtil.is17OrHigher(context.getCompilationUnit().getJavaProject()))
 			return false;
 
-		CatchClause catchClause= (CatchClause) ASTResolving.findAncestor(covering, ASTNode.CATCH_CLAUSE);
-		if (catchClause == null) {
-			return false;
-		}
+		List<CatchClause> catchClauses= null;
+		if (coveredNodes.size() == 0) {
+			CatchClause catchClause= (CatchClause) ASTResolving.findAncestor(covering, ASTNode.CATCH_CLAUSE);
+			if (catchClause == null) {
+				return false;
+			}
 
-		Statement statement= ASTResolving.findParentStatement(covering);
-		if (statement != catchClause.getParent() && statement != catchClause.getBody()) {
-			return false; // selection is in a statement inside the body
-		}
+			Statement statement= ASTResolving.findParentStatement(covering);
+			if (statement != catchClause.getParent() && statement != catchClause.getBody()) {
+				return false; // selection is in a statement inside the body
+			}
 
-		Type type1= catchClause.getException().getType();
-		SimpleType selectedMultiCatchType= null;
-		if (type1.isUnionType() && covering instanceof Name) {
-			Name topMostName= ASTNodes.getTopMostName((Name) covering);
-			ASTNode parent= topMostName.getParent();
-			if (parent instanceof SimpleType) {
-				selectedMultiCatchType= (SimpleType) parent;
+			Type type1= catchClause.getException().getType();
+			SimpleType selectedMultiCatchType= null;
+			if (type1.isUnionType() && covering instanceof Name) {
+				Name topMostName= ASTNodes.getTopMostName((Name) covering);
+				ASTNode parent= topMostName.getParent();
+				if (parent instanceof SimpleType) {
+					selectedMultiCatchType= (SimpleType) parent;
+				}
+			}
+			if (selectedMultiCatchType != null)
+				return false;
+
+			TryStatement tryStatement= (TryStatement) catchClause.getParent();
+			catchClauses= tryStatement.catchClauses();
+		} else {
+			catchClauses= new ArrayList<CatchClause>();
+			for (Iterator<ASTNode> iterator= coveredNodes.iterator(); iterator.hasNext();) {
+				ASTNode astNode= iterator.next();
+				if (!(astNode instanceof CatchClause)) {
+					return false;
+				}
+				catchClauses.add((CatchClause) astNode);
 			}
 		}
-		if (selectedMultiCatchType != null)
-			return false;
 
-		TryStatement tryStatement= (TryStatement) catchClause.getParent();
-		List<CatchClause> catchClauses= tryStatement.catchClauses();
-		if (catchClauses.size() <= 1)
+		if (catchClauses == null || catchClauses.size() <= 1)
 			return false;
 
 		String commonSource= null;
@@ -1623,6 +1641,257 @@ public class QuickAssistProcessor implements IQuickAssistProcessor {
 		List<Statement> statements= catchClause.getBody().statements();
 		for (Iterator<Statement> iterator2= statements.iterator(); iterator2.hasNext();) {
 			newCatchClause.getBody().statements().add(rewrite.createCopyTarget(iterator2.next()));
+		}
+	}
+
+	private static boolean getTryWithResourcesProposals(IInvocationContext context, ASTNode covering, Collection<ICommandAccess> resultingCollections) {
+		if (!JavaModelUtil.is17OrHigher(context.getCompilationUnit().getJavaProject()))
+			return false;
+
+		//TODO: should the user be able to select more than one resource and enclose in one twr ? This should be doable
+		ASTNode node= covering;
+		while (!(node instanceof Statement) && node != null) {
+			node= node.getParent();
+		}
+
+		if (!(node instanceof VariableDeclarationStatement))
+			return false;
+
+		VariableDeclarationStatement variableDeclarationStatement= (VariableDeclarationStatement) node;
+		Type type= variableDeclarationStatement.getType();
+		ITypeBinding typeBinding= type.resolveBinding();
+		if (typeBinding == null) {
+			return false;
+		}
+		String autocloseable= "java.lang.AutoCloseable"; //$NON-NLS-1$
+		ITypeBinding typeInHierarchy= Bindings.findTypeInHierarchy(typeBinding, autocloseable);
+		if (typeInHierarchy == null)
+			return false;
+
+		MethodDeclaration methodDeclaration= ASTResolving.findParentMethodDeclaration(variableDeclarationStatement);
+		List<VariableDeclarationFragment> fragments= variableDeclarationStatement.fragments();
+		VariableDeclarationFragment variableDeclarationFragment= fragments.get(0); //TODO: More than one fragment ?
+
+		VariableReferenceAnalyzer analyzer= new VariableReferenceAnalyzer(variableDeclarationFragment.resolveBinding(), covering);
+		methodDeclaration.accept(analyzer);
+		if (!analyzer.canProduceQuickAssist())
+			return false;
+
+		if (resultingCollections == null) {
+			return true;
+		}
+
+		TryStatement tryStatement= analyzer.getTryStatement();
+		List<MethodInvocation> closeInvocations= analyzer.getCloseInvocations();
+		if (tryStatement != null) {
+			AST ast= node.getAST();
+			ASTRewrite rewrite= ASTRewrite.create(ast);
+			ListRewrite listRewrite= rewrite.getListRewrite(tryStatement, TryStatement.RESOURCES_PROPERTY);
+
+			VariableDeclarationExpression newVariableDeclarationExpression= ast.newVariableDeclarationExpression((VariableDeclarationFragment) rewrite.createCopyTarget(variableDeclarationFragment));
+			newVariableDeclarationExpression.setType((Type) rewrite.createCopyTarget(variableDeclarationStatement.getType()));
+
+			listRewrite.insertLast(newVariableDeclarationExpression, null);
+			rewrite.remove(variableDeclarationStatement, null);
+
+			if (closeInvocations != null)
+				removeCloseInvocations(closeInvocations, rewrite);
+
+			Image image= JavaPluginImages.get(JavaPluginImages.IMG_CORRECTION_CHANGE);
+			String label= Messages.format(CorrectionMessages.QuickAssistProcessor_addresourcetotry_description, variableDeclarationFragment.getName().getIdentifier());
+			ASTRewriteCorrectionProposal proposal= new ASTRewriteCorrectionProposal(label, context.getCompilationUnit(), rewrite, 6, image);
+			resultingCollections.add(proposal);
+		} else {
+			AST ast= node.getAST();
+			ASTRewrite rewrite= ASTRewrite.create(ast);
+
+			TryStatement newTryStatement= ast.newTryStatement();
+			List<ASTNode> nodes= analyzer.getReferences();
+
+			ASTNode start= ASTResolving.findParentStatement(nodes.get(0));
+			ASTNode end= ASTResolving.findParentStatement(nodes.get(nodes.size() - 1));
+
+			ListRewrite tryResourcesListRewrite= rewrite.getListRewrite(newTryStatement, TryStatement.RESOURCES_PROPERTY);
+			VariableDeclarationExpression newVariableDeclarationExpression= ast.newVariableDeclarationExpression((VariableDeclarationFragment) rewrite.createCopyTarget(variableDeclarationFragment));
+			newVariableDeclarationExpression.setType((Type) rewrite.createCopyTarget(variableDeclarationStatement.getType()));
+			tryResourcesListRewrite.insertLast(newVariableDeclarationExpression, null);
+
+			ListRewrite tryStatementsListRewrite= rewrite.getListRewrite(newTryStatement.getBody(), Block.STATEMENTS_PROPERTY);
+			MethodDeclaration parentMethodDeclaration= ASTResolving.findParentMethodDeclaration(node);
+			ArrayList<ASTNode> coveredNodes= getCoveredNodes(start.getStartPosition(), end.getStartPosition() + end.getLength(), parentMethodDeclaration);
+
+			if (closeInvocations != null)
+				removeCloseInvocations(closeInvocations, rewrite);
+
+			if (coveredNodes.size() >= 1) {
+				ListRewrite bodyStatementsListRewrite= rewrite.getListRewrite(coveredNodes.get(1).getParent(), (ChildListPropertyDescriptor) coveredNodes.get(1).getLocationInParent());
+				ASTNode toMove= bodyStatementsListRewrite.createMoveTarget(coveredNodes.get(1), coveredNodes.get(coveredNodes.size() - 1), newTryStatement, null);
+				tryStatementsListRewrite.insertLast(toMove, null);
+			}
+
+			rewrite.remove(variableDeclarationStatement, null);
+
+			Image image= JavaPluginImages.get(JavaPluginImages.IMG_CORRECTION_CHANGE);
+			String label= Messages.format(CorrectionMessages.QuickAssistProcessor_surroundresourcewithtry_description, variableDeclarationFragment.getName().getIdentifier());
+			ASTRewriteCorrectionProposal proposal= new ASTRewriteCorrectionProposal(label, context.getCompilationUnit(), rewrite, 6, image);
+			resultingCollections.add(proposal);
+		}
+		return true;
+	}
+
+	private static void removeCloseInvocations(List<MethodInvocation> closeInvocations, ASTRewrite rewrite) {
+		for (Iterator<MethodInvocation> iterator= closeInvocations.iterator(); iterator.hasNext();) {
+			MethodInvocation closeInvocation= iterator.next();
+			IfStatement parentif= null;
+			Statement parentStatement= ASTResolving.findParentStatement(closeInvocation);
+
+			ASTNode parent= parentStatement.getParent();
+			if (parent instanceof Block) {
+				parent= parent.getParent();
+			}
+			if (parent instanceof IfStatement) {
+				parentif= (IfStatement) parent;
+			}
+
+			if (parentif != null) {
+				Statement thenStatement= parentif.getThenStatement();
+				Statement toRemove= parentif;
+				if (thenStatement instanceof Block) {
+					Block block= (Block) thenStatement;
+					if (block.statements().size() > 1) {
+						toRemove= parentStatement;
+					}
+				}
+				Statement elseStatement= parentif.getElseStatement();
+				if (elseStatement != null && toRemove == parentif) {
+					ASTNode parentBlock= ASTResolving.findAncestor(parentif, ASTNode.BLOCK);
+					if (parentBlock instanceof Block) {
+						Block block2= (Block) parentBlock;
+						ASTNode copyTarget;
+						if (elseStatement instanceof Block) {
+							Block elseBlock= (Block) elseStatement;
+							List<Statement> statements= elseBlock.statements();
+							ASTNode[] array= statements.toArray(new ASTNode[statements.size()]);
+							copyTarget= rewrite.createGroupNode(array);
+						} else {
+							copyTarget= rewrite.createCopyTarget(elseStatement);
+						}
+						ListRewrite listRewrite= rewrite.getListRewrite(block2, Block.STATEMENTS_PROPERTY);
+						listRewrite.insertAfter(copyTarget, parentif, null);
+					}
+				}
+				rewrite.remove(toRemove, null);
+			} else {
+				rewrite.remove(parentStatement, null);
+			}
+		}
+	}
+
+	private static ArrayList<ASTNode> getCoveredNodes(final int selectionBegin, final int selectionEnd, ASTNode coveringNode) {
+		final ArrayList<ASTNode> coveredNodes= new ArrayList<ASTNode>();
+		coveringNode.accept(new GenericVisitor() {
+			@Override
+			protected boolean visitNode(ASTNode node) {
+				int nodeStart= node.getStartPosition();
+				int nodeEnd= nodeStart + node.getLength();
+				// if node does not intersects with selection, don't visit children
+				if (nodeEnd < selectionBegin || selectionEnd < nodeStart) {
+					return false;
+				}
+				// if node is covered, we don't need to visit children
+				if (isCovered(node)) {
+					ASTNode parent= node.getParent();
+					if (parent == null || !isCovered(parent)) {
+						coveredNodes.add(node);
+						return false;
+					}
+				}
+				// if node only partly intersects with selection, we try to find fully covered children
+				return true;
+			}
+
+			private boolean isCovered(ASTNode node) {
+				int begin= node.getStartPosition();
+				int end= begin + node.getLength();
+				return (begin >= selectionBegin && end <= selectionEnd) || (begin <= selectionBegin && end <= selectionEnd) || (begin >= selectionBegin && end >= selectionEnd);
+			}
+		});
+		return coveredNodes;
+	}
+
+	static class VariableReferenceAnalyzer extends ASTVisitor {
+		private List<ASTNode> fReferences= null;
+		private List<MethodInvocation> fCloseInvocations= null;
+		private TryStatement fTryStatement= null;
+		private boolean fIsEnclosedInOneTryStatement= true;
+		private IVariableBinding fBinding;
+		private boolean fCanProduceQuickAssist= true;
+
+		private final ASTNode fCoveringNode;
+
+		public VariableReferenceAnalyzer(IVariableBinding binding, ASTNode coveringNode) {
+			fBinding= binding;
+			fCoveringNode= coveringNode;
+		}
+
+		public List<ASTNode> getReferences() {
+			return fReferences;
+		}
+
+		public List<MethodInvocation> getCloseInvocations() {
+			return fCloseInvocations;
+		}
+
+		public TryStatement getTryStatement() {
+			return fTryStatement;
+		}
+		
+		public boolean canProduceQuickAssist() {
+			return fCanProduceQuickAssist;
+		}
+
+		@Override
+		public boolean visit(SimpleName node) {
+			if (fReferences == null) {
+				fReferences= new ArrayList<ASTNode>();
+			}
+			if (Bindings.equals(fBinding, node.resolveBinding())) {
+				fReferences.add(node);
+
+				StructuralPropertyDescriptor locationInParent= node.getLocationInParent();
+				if (locationInParent instanceof ChildListPropertyDescriptor && locationInParent != InfixExpression.EXTENDED_OPERANDS_PROPERTY) {
+					// e.g. argument lists of MethodInvocation, ClassInstanceCreation ...
+					fCanProduceQuickAssist= false;
+				}
+
+				if (locationInParent == ReturnStatement.EXPRESSION_PROPERTY || locationInParent == Assignment.LEFT_HAND_SIDE_PROPERTY) {
+					fCanProduceQuickAssist= false;
+				}
+				
+				ASTNode tryStatement= ASTResolving.findAncestor(node, ASTNode.TRY_STATEMENT);
+				if (node != fCoveringNode && tryStatement != null) {
+					if (fTryStatement == null && fIsEnclosedInOneTryStatement) {
+						fTryStatement= (TryStatement) tryStatement;
+					} else if (fTryStatement != tryStatement) {
+						fIsEnclosedInOneTryStatement= false;
+						fTryStatement= null;
+					}
+				}
+
+				ASTNode parent= node.getParent();
+				if (parent instanceof MethodInvocation && node.getLocationInParent() == MethodInvocation.EXPRESSION_PROPERTY) {
+					MethodInvocation methodInvocation= (MethodInvocation) parent;
+					IMethodBinding methodBinding= methodInvocation.resolveMethodBinding();
+					if (methodBinding != null) {
+						if ("close".equals(methodBinding.getName())) { //$NON-NLS-1$
+							if (fCloseInvocations == null)
+								fCloseInvocations= new ArrayList<MethodInvocation>();
+							fCloseInvocations.add(methodInvocation);
+						}
+					}
+				}
+			}
+			return false;
 		}
 	}
 
@@ -2208,7 +2477,7 @@ public class QuickAssistProcessor implements IQuickAssistProcessor {
 					ICompilationUnit targetCU= ASTResolving.findCompilationUnitForBinding(cu, astRoot, typeDecl);
 					if (targetCU != null) {
 						String label= Messages.format(CorrectionMessages.QuickAssistProcessor_createmethodinsuper_description, new String[] { BasicElementLabels.getJavaElementName(curr.getName()), BasicElementLabels.getJavaElementName(binding.getName()) });
-						resultingCollections.add(new NewDefiningMethodProposal(label, targetCU, astRoot, typeDecl, binding, paramNames, 6));
+						resultingCollections.add(new NewDefiningMethodProposal(label, targetCU, astRoot, typeDecl, binding, decl, paramNames, 6));
 					}
 				}
 			}

@@ -1855,7 +1855,17 @@
 			helpContextId="org.eclipse.jdt.ui.refactoring.references_in_binary"
 			class="org.eclipse.jdt.internal.ui.search.JavaSearchResultPage">
 		</viewPage>
-   </extension>   
+   </extension>
+   <extension
+    	id="DuplicateCodeSearchResultPage"
+        point="org.eclipse.search.searchResultViewPages">
+		<viewPage
+			id="org.eclipse.jdt.ui.DuplicateCodeSearchResultPage"
+			searchResultClass="org.eclipse.jdt.internal.ui.refactoring.code.search.DuplicateCodeSearchResult"
+			helpContextId="org.eclipse.jdt.ui.java_search_result"
+			class="org.eclipse.jdt.internal.ui.search.JavaSearchResultPage">
+		</viewPage>
+   </extension>
    
    
   
@@ -2500,6 +2510,20 @@
                retarget="true"
                menubarPath="org.eclipse.jdt.ui.refactoring.menu/codingGroup"
                id="org.eclipse.jdt.ui.actions.ExtractMethod">
+         </action>
+         <action
+               definitionId="org.eclipse.jdt.ui.edit.text.java.find.duplicates"
+               label="Find duplicates"
+               retarget="true"
+               menubarPath="org.eclipse.jdt.ui.refactoring.menu/codingGroup"
+               id="org.eclipse.jdt.ui.actions.FindDuplicates">
+         </action>
+         <action
+               definitionId="org.eclipse.jdt.ui.edit.text.java.search.snippet"
+               label="Search snippet"
+               retarget="true"
+               menubarPath="org.eclipse.jdt.ui.refactoring.menu/codingGroup"
+               id="org.eclipse.jdt.ui.actions.SearchSnippet">
          </action>
          <action
                definitionId="org.eclipse.jdt.ui.edit.text.java.modify.method.parameters"
@@ -3830,6 +3854,18 @@
             description="%ActionDefinition.extractMethod.description"
             categoryId="org.eclipse.jdt.ui.category.refactoring"
             id="org.eclipse.jdt.ui.edit.text.java.extract.method">
+      </command>
+      <command
+            name="Find Duplicates"
+            description="Find code duplicates"
+            categoryId="org.eclipse.jdt.ui.category.refactoring"
+            id="org.eclipse.jdt.ui.edit.text.java.find.duplicates">
+      </command>
+      <command
+            name="Search snippet"
+            description="Search for code snippet"
+            categoryId="org.eclipse.jdt.ui.category.refactoring"
+            id="org.eclipse.jdt.ui.edit.text.java.search.snippet">
       </command>
       <command
             name="%ActionDefinition.extractLocalVariable.name"
