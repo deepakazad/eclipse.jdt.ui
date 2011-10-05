@@ -10,6 +10,8 @@
  *******************************************************************************/
 package org.eclipse.jdt.internal.ui.text.correction;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 
@@ -20,6 +22,8 @@ import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.widgets.Canvas;
 
+import org.eclipse.core.runtime.IStatus;
+
 import org.eclipse.jface.util.IPropertyChangeListener;
 import org.eclipse.jface.util.PropertyChangeEvent;
 
@@ -28,6 +32,7 @@ import org.eclipse.jface.text.IDocument;
 import org.eclipse.jface.text.ITextSelection;
 import org.eclipse.jface.text.ITextViewer;
 import org.eclipse.jface.text.Position;
+import org.eclipse.jface.text.contentassist.ICompletionProposal;
 import org.eclipse.jface.text.source.Annotation;
 import org.eclipse.jface.text.source.IAnnotationAccessExtension;
 import org.eclipse.jface.text.source.IAnnotationModel;
@@ -49,6 +54,7 @@ import org.eclipse.jdt.ui.JavaUI;
 import org.eclipse.jdt.ui.PreferenceConstants;
 import org.eclipse.jdt.ui.SharedASTProvider;
 import org.eclipse.jdt.ui.text.java.IInvocationContext;
+import org.eclipse.jdt.ui.text.java.IJavaCompletionProposal;
 
 import org.eclipse.jdt.internal.ui.JavaPluginImages;
 import org.eclipse.jdt.internal.ui.viewsupport.ISelectionListenerWithAST;
@@ -103,11 +109,15 @@ public class QuickAssistLightBulbUpdater {
 	}
 
 	private final Annotation fAnnotation;
+
 	private boolean fIsAnnotationShown;
+
 	private ITextEditor fEditor;
+
 	private ITextViewer fViewer;
 
 	private ISelectionListenerWithAST fListener;
+
 	private IPropertyChangeListener fPropertyChangeListener;
 
 	public QuickAssistLightBulbUpdater(ITextEditor part, ITextViewer viewer) {
@@ -185,7 +195,7 @@ public class QuickAssistLightBulbUpdater {
 	private ICompilationUnit getCompilationUnit() {
 		IJavaElement elem= JavaUI.getEditorInputJavaElement(fEditor.getEditorInput());
 		if (elem instanceof ICompilationUnit) {
-			return (ICompilationUnit) elem;
+			return (ICompilationUnit)elem;
 		}
 		return null;
 	}
@@ -223,7 +233,19 @@ public class QuickAssistLightBulbUpdater {
 	 * Needs to be called synchronized
 	 */
 	private void calculateLightBulb(IAnnotationModel model, IInvocationContext context) {
-		boolean needsAnnotation= JavaCorrectionProcessor.hasAssists(context);
+		boolean needsAnnotation= false; //JavaCorrectionProcessor.hasAssists(context);
+		Collection<IJavaCompletionProposal> list= new ArrayList<IJavaCompletionProposal>();
+		IStatus status= JavaCorrectionProcessor.collectAssists(context, null, list);
+		if (!status.isOK()) {
+			needsAnnotation= false;
+		} else {
+			for (Iterator<IJavaCompletionProposal> iterator= list.iterator(); iterator.hasNext();) {
+				ICompletionProposal proposal= iterator.next();
+				if (!proposal.getDisplayString().startsWith("Assign") && !proposal.getDisplayString().startsWith("Rename")) { //$NON-NLS-1$ //$NON-NLS-2$
+					needsAnnotation= true;
+				}
+			}
+		}
 		if (fIsAnnotationShown) {
 			model.removeAnnotation(fAnnotation);
 		}

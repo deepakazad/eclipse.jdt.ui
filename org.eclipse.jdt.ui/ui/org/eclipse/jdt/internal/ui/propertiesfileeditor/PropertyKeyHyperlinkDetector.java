@@ -30,7 +30,6 @@ import org.eclipse.jface.text.hyperlink.AbstractHyperlinkDetector;
 import org.eclipse.jface.text.hyperlink.IHyperlink;
 
 import org.eclipse.ui.IEditorSite;
-import org.eclipse.ui.IFileEditorInput;
 import org.eclipse.ui.IStorageEditorInput;
 
 import org.eclipse.ui.texteditor.IEditorStatusLine;
@@ -39,10 +38,6 @@ import org.eclipse.ui.texteditor.ITextEditor;
 
 /**
  * Properties key hyperlink detector.
- * <p>
- * XXX: This does not work for properties files coming from a JAR due to missing J Core
- * functionality. For details see http://bugs.eclipse.org/22376
- * </p>
  * 
  * @since 3.1
  */
@@ -136,8 +131,7 @@ public class PropertyKeyHyperlinkDetector extends AbstractHyperlinkDetector {
 		if (offset < 0)
 			return false;
 
-		 // XXX: Must be changed to IStorageEditorInput once support for JARs is available (see class Javadoc for details)
-		return textEditor.getEditorInput() instanceof IFileEditorInput;
+		return textEditor.getEditorInput() instanceof IStorageEditorInput;
 	}
 
 	private void showErrorInStatusLine(final String message, ITextEditor textEditor) {
