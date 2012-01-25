@@ -36,6 +36,7 @@ import org.eclipse.ltk.core.refactoring.Refactoring;
 import org.eclipse.jdt.core.Flags;
 import org.eclipse.jdt.core.IBuffer;
 import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaModelMarker;
 import org.eclipse.jdt.core.IJavaProject;
@@ -127,6 +128,7 @@ import org.eclipse.jdt.internal.corext.refactoring.code.ConvertAnonymousToNested
 import org.eclipse.jdt.internal.corext.refactoring.code.ExtractConstantRefactoring;
 import org.eclipse.jdt.internal.corext.refactoring.code.ExtractMethodRefactoring;
 import org.eclipse.jdt.internal.corext.refactoring.code.ExtractTempRefactoring;
+import org.eclipse.jdt.internal.corext.refactoring.code.InlineConstantRefactoring;
 import org.eclipse.jdt.internal.corext.refactoring.code.InlineTempRefactoring;
 import org.eclipse.jdt.internal.corext.refactoring.code.PromoteTempToFieldRefactoring;
 import org.eclipse.jdt.internal.corext.refactoring.util.TightSourceRangeComputer;
@@ -209,6 +211,7 @@ public class QuickAssistProcessor implements IQuickAssistProcessor {
 				|| getExtractVariableProposal(context, false, null)
 				|| getExtractMethodProposal(context, coveringNode, false, null)
 				|| getInlineLocalProposal(context, coveringNode, null)
+				|| getInlineConstantProposal(context, coveringNode, null)
 				|| getConvertLocalToFieldProposal(context, coveringNode, null)
 				|| getConvertAnonymousToNestedProposal(context, coveringNode, null)
 				|| getRemoveBlockProposals(context, coveringNode, null)
@@ -252,6 +255,7 @@ public class QuickAssistProcessor implements IQuickAssistProcessor {
 				getExtractVariableProposal(context, problemsAtLocation, resultingCollections);
 				getExtractMethodProposal(context, coveringNode, problemsAtLocation, resultingCollections);
 				getInlineLocalProposal(context, coveringNode, resultingCollections);
+				getInlineConstantProposal(context, coveringNode, resultingCollections);
 				getConvertLocalToFieldProposal(context, coveringNode, resultingCollections);
 				getConvertAnonymousToNestedProposal(context, coveringNode, resultingCollections);
 				if (!getConvertForLoopProposal(context, coveringNode, resultingCollections))
@@ -2607,6 +2611,43 @@ public class QuickAssistProcessor implements IQuickAssistProcessor {
 		InlineTempRefactoring refactoring= new InlineTempRefactoring((VariableDeclaration) decl);
 		if (refactoring.checkInitialConditions(new NullProgressMonitor()).isOK()) {
 			String label= CorrectionMessages.QuickAssistProcessor_inline_local_description;
+			Image image= JavaPluginImages.get(JavaPluginImages.IMG_CORRECTION_CHANGE);
+			RefactoringCorrectionProposal proposal= new RefactoringCorrectionProposal(label, context.getCompilationUnit(), refactoring, 5, image);
+			proposal.setCommandId(INLINE_LOCAL_ID);
+			proposals.add(proposal);
+
+		}
+		return true;
+	}
+	
+	private static boolean getInlineConstantProposal(IInvocationContext context, final ASTNode node, Collection<ICommandAccess> proposals) throws CoreException {
+		if (!(node instanceof SimpleName))
+			return false;
+
+		SimpleName name= (SimpleName) node;
+		IBinding binding= name.resolveBinding();
+		if (!(binding instanceof IVariableBinding))
+			return false;
+		IVariableBinding varBinding= (IVariableBinding) binding;
+		if (!varBinding.isField())
+			return false;
+		IJavaElement element= varBinding.getJavaElement();
+		if (!(element instanceof IField)) {
+			return false;
+		}
+		/*ASTNode decl= context.getASTRoot().findDeclaringNode(varBinding);
+		if (!(decl instanceof VariableDeclarationFragment) || decl.getLocationInParent() != VariableDeclarationStatement.FRAGMENTS_PROPERTY)
+			return false;*/
+
+
+		if (proposals == null) {
+			return true;
+		}
+
+		InlineConstantRefactoring refactoring= new InlineConstantRefactoring(context.getCompilationUnit(), context.getASTRoot(), context.getSelectionOffset(), context.getSelectionLength());
+//		InlineConstantRefactoring refactoring= new InlineConstantRefactoring((IField) element);
+		if (refactoring.checkInitialConditions(new NullProgressMonitor()).isOK()) {
+			String label= "Inline constant";
 			Image image= JavaPluginImages.get(JavaPluginImages.IMG_CORRECTION_CHANGE);
 			RefactoringCorrectionProposal proposal= new RefactoringCorrectionProposal(label, context.getCompilationUnit(), refactoring, 5, image);
 			proposal.setCommandId(INLINE_LOCAL_ID);
