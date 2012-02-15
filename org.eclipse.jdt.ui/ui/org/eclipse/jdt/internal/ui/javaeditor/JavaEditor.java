@@ -1528,6 +1528,18 @@ public abstract class JavaEditor extends AbstractDecoratedTextEditor implements 
 
 	/** Preference key for matching brackets */
 	protected final static String MATCHING_BRACKETS=  PreferenceConstants.EDITOR_MATCHING_BRACKETS;
+	/**
+	 * Preference key for highlighting bracket at caret location
+	 * 
+	 * @since 3.8
+	 */
+	protected final static String HIGHLIGHT_BRACKET_AT_CARET_LOCATION= PreferenceConstants.EDITOR_HIGHLIGHT_BRACKET_AT_CARET_LOCATION;
+	/**
+	 * Preference key for enclosing brackets
+	 * 
+	 * @since 3.8
+	 */
+	protected final static String ENCLOSING_BRACKETS= PreferenceConstants.EDITOR_ENCLOSING_BRACKETS;
 	/** Preference key for matching brackets color */
 	protected final static String MATCHING_BRACKETS_COLOR=  PreferenceConstants.EDITOR_MATCHING_BRACKETS_COLOR;
 	/**
@@ -1768,6 +1780,12 @@ public abstract class JavaEditor extends AbstractDecoratedTextEditor implements 
 	 */
 	private static final long ERROR_MESSAGE_TIMEOUT= 1000;
 
+	/**
+	 * Previous location history for goto matching bracket action.
+	 * 
+	 * @since 3.8
+	 */
+	private List<IRegion> fPreviousSelections;
 
 	/**
 	 * Returns the most narrow java element including the given offset.
@@ -3116,7 +3134,7 @@ public abstract class JavaEditor extends AbstractDecoratedTextEditor implements 
 
 		fBracketMatcher.setSourceVersion(getPreferenceStore().getString(JavaCore.COMPILER_SOURCE));
 		support.setCharacterPairMatcher(fBracketMatcher);
-		support.setMatchingCharacterPainterPreferenceKeys(MATCHING_BRACKETS, MATCHING_BRACKETS_COLOR);
+		support.setMatchingCharacterPainterPreferenceKeys(MATCHING_BRACKETS, MATCHING_BRACKETS_COLOR, HIGHLIGHT_BRACKET_AT_CARET_LOCATION, ENCLOSING_BRACKETS);
 
 		super.configureSourceViewerDecorationSupport(support);
 	}
@@ -3647,12 +3665,34 @@ public abstract class JavaEditor extends AbstractDecoratedTextEditor implements 
 			return;
 		}
 
-		// #26314
 		int sourceCaretOffset= selection.getOffset() + selection.getLength();
-		if (isSurroundedByBrackets(document, sourceCaretOffset))
-			sourceCaretOffset -= selection.getLength();
+		int adjustment= getOffsetAdjustment(document, sourceCaretOffset, selection.getLength()); // handles non-zero selection
+		sourceCaretOffset+= adjustment;
 
+		if (fPreviousSelections == null)
+			initializePrevSelectionList();
 		IRegion region= fBracketMatcher.match(document, sourceCaretOffset);
+		if (region == null) {
+			region= fBracketMatcher.findEnclosingPeerCharacters(document, sourceCaretOffset);
+			initializePrevSelectionList();
+			fPreviousSelections.add(selection);
+		} else {
+			if (fPreviousSelections.size() == 2) {
+				if (!selection.equals(fPreviousSelections.get(1))) {
+					initializePrevSelectionList();
+				}
+			} else if (fPreviousSelections.size() == 3) {
+				if (selection.equals(fPreviousSelections.get(2)) && !selection.equals(fPreviousSelections.get(0))) {
+					IRegion originalSelection= fPreviousSelections.get(0);
+					sourceViewer.setSelectedRange(originalSelection.getOffset(), originalSelection.getLength());
+					sourceViewer.revealRange(originalSelection.getOffset(), originalSelection.getLength());
+					initializePrevSelectionList();
+					return;
+				}
+				initializePrevSelectionList();
+			}
+		}
+
 		if (region == null) {
 			setStatusLineErrorMessage(JavaEditorMessages.GotoMatchingBracket_error_noMatchingBracket);
 			sourceViewer.getTextWidget().getDisplay().beep();
@@ -3685,11 +3725,55 @@ public abstract class JavaEditor extends AbstractDecoratedTextEditor implements 
 			return;
 		}
 
-		if (selection.getLength() < 0)
-			targetOffset -= selection.getLength();
+		targetOffset+= adjustment;
+		if (fPreviousSelections.size() == 1 && selection.getLength() < 0) {
+			targetOffset++;
+		}
 
+		if (fPreviousSelections.size() > 0) {
+			fPreviousSelections.add(new Region(targetOffset, selection.getLength()));
+		}
 		sourceViewer.setSelectedRange(targetOffset, selection.getLength());
 		sourceViewer.revealRange(targetOffset, selection.getLength());
+	}
+
+	private void initializePrevSelectionList() {
+		fPreviousSelections= new ArrayList<IRegion>(3);
+	}
+
+	private static boolean isOpeningBracket(char character) {
+		for (int i= 0; i < BRACKETS.length; i+= 2) {
+			if (character == BRACKETS[i])
+				return true;
+		}
+		return false;
+	}
+
+	private static boolean isClosingBracket(char character) {
+		for (int i= 1; i < BRACKETS.length; i+= 2) {
+			if (character == BRACKETS[i])
+				return true;
+		}
+		return false;
+	}
+
+	private static int getOffsetAdjustment(IDocument document, int offset, int length) {
+		if (length == 0)
+			return 0;
+		try {
+			if (length < 0) {
+				if (isOpeningBracket(document.getChar(offset))) {
+					return 1;
+				}
+			} else {
+				if (isClosingBracket(document.getChar(offset - 1))) {
+					return -1;
+				}
+			}
+		} catch (BadLocationException e) {
+			//do nothing
+		}
+		return 0;
 	}
 
 	/**
@@ -3744,27 +3828,6 @@ public abstract class JavaEditor extends AbstractDecoratedTextEditor implements 
 	protected void handleCursorPositionChanged() {
 		super.handleCursorPositionChanged();
 		fCachedSelectedRange= getViewer().getSelectedRange();
-	}
-
-	private static boolean isBracket(char character) {
-		for (int i= 0; i != BRACKETS.length; ++i)
-			if (character == BRACKETS[i])
-				return true;
-		return false;
-	}
-
-	private static boolean isSurroundedByBrackets(IDocument document, int offset) {
-		if (offset == 0 || offset == document.getLength())
-			return false;
-
-		try {
-			return
-				isBracket(document.getChar(offset - 1)) &&
-				isBracket(document.getChar(offset));
-
-		} catch (BadLocationException e) {
-			return false;
-		}
 	}
 
 	/**
