@@ -40,6 +40,10 @@ import org.eclipse.jface.resource.JFaceResources;
 
 import org.eclipse.ui.dialogs.PreferencesUtil;
 
+import org.eclipse.ui.texteditor.AnnotationPreference;
+
+import org.eclipse.ui.editors.text.EditorsUI;
+
 import org.eclipse.jdt.ui.PreferenceConstants;
 
 import org.eclipse.jdt.internal.ui.preferences.OverlayPreferenceStore.OverlayKey;
@@ -54,7 +58,6 @@ import org.eclipse.jdt.internal.ui.text.java.hover.SourceViewerInformationContro
 class JavaEditorAppearanceConfigurationBlock extends AbstractConfigurationBlock {
 
 	private final String[][] fAppearanceColorListModel= new String[][] {
-			{PreferencesMessages.JavaEditorPreferencePage_matchingBracketsHighlightColor2, PreferenceConstants.EDITOR_MATCHING_BRACKETS_COLOR, null},
 			{PreferencesMessages.JavaEditorPreferencePage_backgroundForMethodParameters, PreferenceConstants.CODEASSIST_PARAMETERS_BACKGROUND, null },
 			{PreferencesMessages.JavaEditorPreferencePage_foregroundForMethodParameters, PreferenceConstants.CODEASSIST_PARAMETERS_FOREGROUND, null },
 			{PreferencesMessages.JavaEditorPreferencePage_backgroundForCompletionReplacement, PreferenceConstants.CODEASSIST_REPLACEMENT_BACKGROUND, null },
@@ -87,7 +90,6 @@ class JavaEditorAppearanceConfigurationBlock extends AbstractConfigurationBlock 
 
 		ArrayList<OverlayKey> overlayKeys= new ArrayList<OverlayKey>();
 
-		overlayKeys.add(new OverlayPreferenceStore.OverlayKey(OverlayPreferenceStore.STRING, PreferenceConstants.EDITOR_MATCHING_BRACKETS_COLOR));
 		overlayKeys.add(new OverlayPreferenceStore.OverlayKey(OverlayPreferenceStore.BOOLEAN, PreferenceConstants.EDITOR_MATCHING_BRACKETS));
 		overlayKeys.add(new OverlayPreferenceStore.OverlayKey(OverlayPreferenceStore.BOOLEAN, PreferenceConstants.EDITOR_HIGHLIGHT_BRACKET_AT_CARET_LOCATION));
 		overlayKeys.add(new OverlayPreferenceStore.OverlayKey(OverlayPreferenceStore.BOOLEAN, PreferenceConstants.EDITOR_ENCLOSING_BRACKETS));
@@ -213,7 +215,7 @@ class JavaEditorAppearanceConfigurationBlock extends AbstractConfigurationBlock 
         return Dialog.convertHeightInCharsToPixels(fFontMetrics, chars);
     }
 
-    private Control createAppearancePage(Composite parent) {
+	private Control createAppearancePage(final Composite parent) {
 
 		Composite appearanceComposite= new Composite(parent, SWT.NONE);
 		GridLayout layout= new GridLayout();
@@ -282,6 +284,30 @@ class JavaEditorAppearanceConfigurationBlock extends AbstractConfigurationBlock 
 			}
 		});
 		createDependency(fBracketHighlightingCheckbox, fEnclosingBracketsRadioButton);
+
+		spacer= new Label(appearanceComposite, SWT.LEFT);
+		gd= new GridData(GridData.HORIZONTAL_ALIGN_FILL);
+		gd.horizontalSpan= 2;
+		gd.heightHint= convertHeightInCharsToPixels(1) / 2;
+		spacer.setLayoutData(gd);
+
+		Link link= new Link(appearanceComposite, SWT.NONE);
+		link.setText(PreferencesMessages.JavaEditorPreferencePage_configureAppearance);
+		link.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				String data= null;
+				AnnotationPreference preference= EditorsUI.getAnnotationPreferenceLookup().getAnnotationPreference("org.eclipse.ui.workbench.texteditor.matchingBrackets"); //$NON-NLS-1$
+				if (preference != null)
+					data= preference.getPreferenceLabel();
+				PreferencesUtil.createPreferenceDialogOn(parent.getShell(), e.text, null, data);
+			}
+		});
+
+		gd= new GridData(GridData.HORIZONTAL_ALIGN_BEGINNING);
+		gd.horizontalIndent= INDENT;
+		gd.horizontalSpan= 2;
+		link.setLayoutData(gd);
 
 		spacer= new Label(appearanceComposite, SWT.LEFT);
 		gd= new GridData(GridData.HORIZONTAL_ALIGN_FILL);

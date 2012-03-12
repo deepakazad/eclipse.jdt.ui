@@ -1544,7 +1544,7 @@ public abstract class JavaEditor extends AbstractDecoratedTextEditor implements 
 	protected final static String ENCLOSING_BRACKETS= PreferenceConstants.EDITOR_ENCLOSING_BRACKETS;
 
 	/** Preference key for matching brackets color. */
-	protected final static String MATCHING_BRACKETS_COLOR=  PreferenceConstants.EDITOR_MATCHING_BRACKETS_COLOR;
+	protected final static String MATCHING_BRACKETS_COLOR= "matchingBracketsIndicationColor"; //$NON-NLS-1$
 	/**
 	 * A named preference that controls whether the editor shows a breadcrumb.
 	 * <p>

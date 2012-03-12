@@ -729,12 +729,13 @@ public class PreferenceConstants {
 	/**
 	 * A named preference that holds the color used to highlight matching brackets.
 	 * <p>
-	 * Value is of type <code>String</code>. A RGB color value encoded as a string
-	 * using class <code>PreferenceConverter</code>
+	 * Value is of type <code>String</code>. A RGB color value encoded as a string using class
+	 * <code>PreferenceConverter</code>
 	 * </p>
-	 *
+	 * 
 	 * @see org.eclipse.jface.resource.StringConverter
 	 * @see org.eclipse.jface.preference.PreferenceConverter
+	 * @deprecated as of 3.8 replaced by {@link org.eclipse.ui.texteditor.MarkerAnnotationPreferences}
 	 */
 	public final static String EDITOR_MATCHING_BRACKETS_COLOR=  "matchingBracketsColor"; //$NON-NLS-1$
 

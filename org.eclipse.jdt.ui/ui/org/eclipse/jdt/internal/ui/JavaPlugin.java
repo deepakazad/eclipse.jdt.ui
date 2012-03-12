@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2011 IBM Corporation and others.
+ * Copyright (c) 2000, 2012 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -414,6 +414,9 @@ public class JavaPlugin extends AbstractUIPlugin {
 	/** @deprecated to avoid deprecation warnings */
 	private static final String DEPRECATED_CODEASSIST_ORDER_PROPOSALS= PreferenceConstants.CODEASSIST_ORDER_PROPOSALS;
 
+	/** @deprecated to avoid deprecation warnings */
+	private static final String EDITOR_MATCHING_BRACKETS_COLOR= PreferenceConstants.EDITOR_MATCHING_BRACKETS_COLOR;
+
 	/**
 	 * Installs backwards compatibility for the preference store.
 	 */
@@ -519,6 +522,17 @@ public class JavaPlugin extends AbstractUIPlugin {
 		}
 		store.setValue(proposalOrderMigrated, true);
 
+		/*
+		 * Backward compatibility: migrate "bracket highlight color" preference to the new annotation color. This is done only
+		 * once.
+		 */
+		String matchingBracketsColorMigrated= "matchingBracketsColorMigrated"; //$NON-NLS-1$
+		if (store.contains(EDITOR_MATCHING_BRACKETS_COLOR) && !store.isDefault(EDITOR_MATCHING_BRACKETS_COLOR)) {
+			if (!store.getBoolean(matchingBracketsColorMigrated)) {
+				EditorsUI.getPreferenceStore().setValue("matchingBracketsIndicationColor", store.getString(EDITOR_MATCHING_BRACKETS_COLOR)); //$NON-NLS-1$
+			}
+		}
+		store.setValue(matchingBracketsColorMigrated, true);
 	}
 
 	/**
