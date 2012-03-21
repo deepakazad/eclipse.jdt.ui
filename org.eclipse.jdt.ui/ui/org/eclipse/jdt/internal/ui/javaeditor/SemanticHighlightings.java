@@ -1513,7 +1513,7 @@ public class SemanticHighlightings {
 			SimpleName name= token.getNode();
 			ASTNode node= name.getParent();
 			int nodeType= node.getNodeType();
-			if (nodeType != ASTNode.METHOD_INVOCATION && nodeType != ASTNode.SIMPLE_TYPE && nodeType != ASTNode.QUALIFIED_TYPE && nodeType != ASTNode.QUALIFIED_NAME
+			if (nodeType != ASTNode.METHOD_INVOCATION && nodeType != ASTNode.SIMPLE_TYPE && nodeType != ASTNode.QUALIFIED_TYPE
 					&& nodeType != ASTNode.QUALIFIED_NAME && nodeType != ASTNode.ENUM_DECLARATION)
 				return false;
 			while (nodeType == ASTNode.QUALIFIED_NAME) {
