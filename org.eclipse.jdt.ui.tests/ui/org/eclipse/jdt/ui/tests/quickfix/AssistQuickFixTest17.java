@@ -1014,4 +1014,94 @@ public class AssistQuickFixTest17 extends QuickFixTest {
 		assertEqualString(preview, buf.toString());
 	}
 
+
+	public void testUseTryWithResources1() throws Exception {
+		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
+		StringBuffer buf= new StringBuffer();
+		buf.append("package test1;\n");
+		buf.append("import java.io.FileReader;\n");
+		buf.append("public class E {\n");
+		buf.append("    void foo() throws Exception {\n");
+		buf.append("        FileReader reader = new FileReader(\"file\");\n");
+		buf.append("        try {\n");
+		buf.append("            int ch;\n");
+		buf.append("            while ((ch = reader.read()) != -1) {\n");
+		buf.append("                System.out.println(ch);\n");
+		buf.append("            }\n");
+		buf.append("        } finally {\n");
+		buf.append("            reader.close();\n");
+		buf.append("        }\n");
+		buf.append("    }\n");
+		buf.append("}\n");
+
+		ICompilationUnit cu= pack1.createCompilationUnit("E.java", buf.toString(), false, null);
+
+		int offset= buf.toString().indexOf("reader = ");
+		AssistContext context= getCorrectionContext(cu, offset, 0);
+		assertNoErrors(context);
+		List proposals= collectAssists(context, false);
+
+		assertCorrectLabels(proposals);
+
+		buf= new StringBuffer();
+		buf.append("package test1;\n");
+		buf.append("import java.io.FileReader;\n");
+		buf.append("public class E {\n");
+		buf.append("    void foo() throws Exception {\n");
+		buf.append("        try (FileReader reader = new FileReader(\"file\")) {\n");
+		buf.append("            int ch;\n");
+		buf.append("            while ((ch = reader.read()) != -1) {\n");
+		buf.append("                System.out.println(ch);\n");
+		buf.append("            }\n");
+		buf.append("        } finally {\n");
+		buf.append("        }\n");
+		buf.append("    }\n");
+		buf.append("}\n");
+		String expected1= buf.toString();
+
+		assertExpectedExistInProposals(proposals, new String[] { expected1 });
+	}
+
+	public void testUseTryWithResources2() throws Exception {
+		IPackageFragment pack1= fSourceFolder.createPackageFragment("test1", false, null);
+		StringBuffer buf= new StringBuffer();
+		buf.append("package test1;\n");
+		buf.append("import java.io.FileReader;\n");
+		buf.append("public class E {\n");
+		buf.append("    void foo() throws Exception {\n");
+		buf.append("        FileReader reader = new FileReader(\"file\");\n");
+		buf.append("        int ch;\n");
+		buf.append("        while ((ch = reader.read()) != -1) {\n");
+		buf.append("            System.out.println(ch);\n");
+		buf.append("        }\n");
+		buf.append("        if (reader != null) {\n");
+		buf.append("            reader.close();\n");
+		buf.append("        }\n");
+		buf.append("    }\n");
+		buf.append("}\n");
+
+		ICompilationUnit cu= pack1.createCompilationUnit("E.java", buf.toString(), false, null);
+
+		int offset= buf.toString().indexOf("reader = ");
+		AssistContext context= getCorrectionContext(cu, offset, 0);
+		assertNoErrors(context);
+		List proposals= collectAssists(context, false);
+
+		assertCorrectLabels(proposals);
+
+		buf= new StringBuffer();
+		buf.append("package test1;\n");
+		buf.append("import java.io.FileReader;\n");
+		buf.append("public class E {\n");
+		buf.append("    void foo() throws Exception {\n");
+		buf.append("        try (FileReader reader = new FileReader(\"file\")){int ch;\n");
+		buf.append("        while ((ch = reader.read()) != -1) {\n");
+		buf.append("            System.out.println(ch);\n");
+		buf.append("        }} \n");
+		buf.append("    }\n");
+		buf.append("}\n");
+		String expected1= buf.toString();
+
+		assertExpectedExistInProposals(proposals, new String[] { expected1 });
+	}
 }

@@ -60,6 +60,7 @@ import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Modifier;
 import org.eclipse.jdt.core.dom.Name;
+import org.eclipse.jdt.core.dom.NumberLiteral;
 import org.eclipse.jdt.core.dom.ParenthesizedExpression;
 import org.eclipse.jdt.core.dom.PrefixExpression;
 import org.eclipse.jdt.core.dom.PrimitiveType;
@@ -150,6 +151,7 @@ public class AdvancedQuickAssistProcessor implements IQuickAssistProcessor {
 					|| getPullNegationUpProposals(context, coveredNodes, null)
 					|| getJoinIfListInIfElseIfProposals(context, coveringNode, coveredNodes, null)
 					|| getConvertSwitchToIfProposals(context, coveringNode, null)
+					|| getConvertBaseProposals(context, coveringNode, null)
 					|| GetterSetterCorrectionSubProcessor.addGetterSetterProposal(context, coveringNode, null, null);
 		}
 		return false;
@@ -191,6 +193,7 @@ public class AdvancedQuickAssistProcessor implements IQuickAssistProcessor {
 				getPullNegationUpProposals(context, coveredNodes, resultingCollections);
 				getJoinIfListInIfElseIfProposals(context, coveringNode, coveredNodes, resultingCollections);
 				getConvertSwitchToIfProposals(context, coveringNode, resultingCollections);
+				getConvertBaseProposals(context, coveringNode, resultingCollections);
 				GetterSetterCorrectionSubProcessor.addGetterSetterProposal(context, coveringNode, locations, resultingCollections);
 			}
 
@@ -1671,6 +1674,7 @@ public class AdvancedQuickAssistProcessor implements IQuickAssistProcessor {
 
 
 		// prepare conditional expression
+		//Conditional quick assist
 		ConditionalExpression conditionalExpression= ast.newConditionalExpression();
 		Expression conditionCopy= (Expression) rewrite.createCopyTarget(ifStatement.getExpression());
 		conditionalExpression.setExpression(conditionCopy);
@@ -2407,5 +2411,102 @@ public class AdvancedQuickAssistProcessor implements IQuickAssistProcessor {
 			return newBlock;
 		}
 		return (Statement) rewrite.createMoveTarget(source);
+	}
+	
+	private static boolean getConvertBaseProposals(IInvocationContext context, ASTNode covering, Collection<ICommandAccess> resultingCollections) {
+		//TODO: 0xCAFEBABE - quick assist on this throws exceptions -- range problems I suppose
+		//TODO: does not work with literals having underscore, maybe have to try with newer JDK
+		
+		if (!(covering instanceof NumberLiteral))
+			return false;
+
+		NumberLiteral numberLiteral= (NumberLiteral) covering;
+		String token= numberLiteral.getToken();
+		if (token.indexOf('.') != -1)
+			return false;
+
+		if(resultingCollections==null)
+			return true;
+		
+		AST ast= covering.getAST();
+		Image image= JavaPluginImages.get(JavaPluginImages.IMG_CORRECTION_CHANGE);
+		if (token.startsWith("0b") || token.startsWith("0B")) { //$NON-NLS-1$ //$NON-NLS-2$
+			//binary
+			String binaryString= token.substring(2);
+			int i= Integer.parseInt(binaryString, 2);
+
+			convertToOctal(context, resultingCollections, numberLiteral, ast, image, i);
+			convertToHex(context, resultingCollections, numberLiteral, ast, image, i);
+			convertToDecimal(context, resultingCollections, numberLiteral, ast, image, i);
+			return true;
+		} else if (token.startsWith("0x") || token.startsWith("0X")) { //$NON-NLS-1$
+			//hex
+			String hexString= token.substring(2);
+			int i= Integer.parseInt(hexString, 16);
+
+			convertToBinary(context, resultingCollections, numberLiteral, ast, image, i);
+			convertToOctal(context, resultingCollections, numberLiteral, ast, image, i);
+			convertToDecimal(context, resultingCollections, numberLiteral, ast, image, i);
+			return true;
+		} else if (token.startsWith("0")) { //$NON-NLS-1$
+			//octal
+			String octalString= token.substring(1);
+			int i= Integer.parseInt(octalString, 8);
+
+			convertToBinary(context, resultingCollections, numberLiteral, ast, image, i);
+			convertToHex(context, resultingCollections, numberLiteral, ast, image, i);
+			convertToDecimal(context, resultingCollections, numberLiteral, ast, image, i);
+			return true;
+		}  else {
+			//decimal
+			int i= Integer.parseInt(token);
+
+			convertToBinary(context, resultingCollections, numberLiteral, ast, image, i);
+			convertToOctal(context, resultingCollections, numberLiteral, ast, image, i);
+			convertToHex(context, resultingCollections, numberLiteral, ast, image, i);
+			return true;
+		}
+	}
+
+	private static void convertToBinary(IInvocationContext context, Collection<ICommandAccess> resultingCollections, NumberLiteral numberLiteral, AST ast, Image image, int i) {
+		if (!JavaModelUtil.is17OrHigher(context.getCompilationUnit().getJavaProject()))
+			return;
+		ASTRewrite rewrite= ASTRewrite.create(ast);
+		NumberLiteral binary= ast.newNumberLiteral();
+		binary.setToken("0b".concat(Integer.toBinaryString(i))); //$NON-NLS-1$
+		rewrite.replace(numberLiteral, binary, null);
+		String label= "Convert to Binary";
+		ASTRewriteCorrectionProposal proposal= new ASTRewriteCorrectionProposal(label, context.getCompilationUnit(), rewrite, -10, image);
+		resultingCollections.add(proposal);
+	}
+
+	private static void convertToDecimal(IInvocationContext context, Collection<ICommandAccess> resultingCollections, NumberLiteral numberLiteral, AST ast, Image image, int i) {
+		ASTRewrite rewrite= ASTRewrite.create(ast);
+		NumberLiteral decimal= ast.newNumberLiteral();
+		decimal.setToken(Integer.toString(i));
+		rewrite.replace(numberLiteral, decimal, null);
+		String label= "Convert to Decimal";
+		ASTRewriteCorrectionProposal proposal= new ASTRewriteCorrectionProposal(label, context.getCompilationUnit(), rewrite, -10, image);
+		resultingCollections.add(proposal);
+	}
+
+	private static void convertToHex(IInvocationContext context, Collection<ICommandAccess> resultingCollections, NumberLiteral numberLiteral, AST ast, Image image, int i) {
+		ASTRewrite rewrite= ASTRewrite.create(ast);
+		NumberLiteral hex= ast.newNumberLiteral();
+		hex.setToken("0x".concat(Integer.toHexString(i))); //$NON-NLS-1$
+		rewrite.replace(numberLiteral, hex, null);
+		String label= "Convert to Hexadecimal";
+		ASTRewriteCorrectionProposal proposal= new ASTRewriteCorrectionProposal(label, context.getCompilationUnit(), rewrite, -10, image);
+		resultingCollections.add(proposal);
+	}
+
+	private static void convertToOctal(IInvocationContext context, Collection<ICommandAccess> resultingCollections, NumberLiteral numberLiteral, AST ast, Image image, int i) {
+		ASTRewrite rewrite= ASTRewrite.create(ast);
+		NumberLiteral octal= ast.newNumberLiteral();
+		octal.setToken("0".concat(Integer.toOctalString(i))); //$NON-NLS-1$
+		rewrite.replace(numberLiteral, octal, null);
+		String label= "Convert to Octal";
+		ASTRewriteCorrectionProposal proposal= new ASTRewriteCorrectionProposal(label, context.getCompilationUnit(), rewrite, -10, image);
+		resultingCollections.add(proposal);
 	}
 }
