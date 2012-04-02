@@ -127,6 +127,7 @@ public class AdvancedQuickAssistProcessor implements IQuickAssistProcessor {
 		if (coveringNode != null) {
 			ArrayList<ASTNode> coveredNodes= getFullyCoveredNodes(context, coveringNode);
 			return getInverseIfProposals(context, coveringNode, null)
+					//|| getReturnQuicklyFromIfProposals(context, coveringNode, null)
 					|| getIfReturnIntoIfElseAtEndOfVoidMethodProposals(context, coveringNode, null)
 					|| getInverseIfContinueIntoIfThenInLoopsProposals(context, coveringNode, null)
 					|| getInverseIfIntoContinueInLoopsProposals(context, coveringNode, null)
@@ -169,6 +170,7 @@ public class AdvancedQuickAssistProcessor implements IQuickAssistProcessor {
 
 			if (QuickAssistProcessor.noErrorsAtLocation(locations)) {
 				getInverseIfProposals(context, coveringNode, resultingCollections);
+				//getReturnQuicklyFromIfProposals(context, coveringNode, resultingCollections);
 				getIfReturnIntoIfElseAtEndOfVoidMethodProposals(context, coveringNode, resultingCollections);
 				getInverseIfContinueIntoIfThenInLoopsProposals(context, coveringNode, resultingCollections);
 				getInverseIfIntoContinueInLoopsProposals(context, coveringNode, resultingCollections);
@@ -268,10 +270,10 @@ public class AdvancedQuickAssistProcessor implements IQuickAssistProcessor {
 		if (!(covering instanceof IfStatement)) {
 			return false;
 		}
-		IfStatement ifStatement= (IfStatement) covering;
-		if (ifStatement.getElseStatement() == null) {
+		IfStatement ifStatement= (IfStatement)covering;
+		/*if (ifStatement.getElseStatement() == null) {
 			return false;
-		}
+		}*/
 		//  we could produce quick assist
 		if (resultingCollections == null) {
 			return true;
@@ -282,23 +284,100 @@ public class AdvancedQuickAssistProcessor implements IQuickAssistProcessor {
 		Statement thenStatement= ifStatement.getThenStatement();
 		Statement elseStatement= ifStatement.getElseStatement();
 
-		// prepare original nodes
 		Expression inversedExpression= getInversedExpression(rewrite, ifStatement.getExpression());
+		if (elseStatement != null) {
+			Statement newElseStatement= (Statement)rewrite.createMoveTarget(thenStatement);
+			Statement newThenStatement= (Statement)rewrite.createMoveTarget(elseStatement);
+			// set new nodes
+			rewrite.set(ifStatement, IfStatement.EXPRESSION_PROPERTY, inversedExpression, null);
 
-		Statement newElseStatement= (Statement) rewrite.createMoveTarget(thenStatement);
-		Statement newThenStatement= (Statement) rewrite.createMoveTarget(elseStatement);
-		// set new nodes
-		rewrite.set(ifStatement, IfStatement.EXPRESSION_PROPERTY, inversedExpression, null);
+			if (elseStatement instanceof IfStatement) {// bug 79507 && bug 74580
+				Block elseBlock= ast.newBlock();
+				elseBlock.statements().add(newThenStatement);
+				newThenStatement= elseBlock;
+			}
+			rewrite.set(ifStatement, IfStatement.THEN_STATEMENT_PROPERTY, newThenStatement, null);
+			rewrite.set(ifStatement, IfStatement.ELSE_STATEMENT_PROPERTY, newElseStatement, null);
+		} else {
+			List<Statement> statements= getUnwrappedStatements(thenStatement);
 
-		if (elseStatement instanceof IfStatement) {// bug 79507 && bug 74580
-			Block elseBlock= ast.newBlock();
-			elseBlock.statements().add(newThenStatement);
-			newThenStatement= elseBlock;
+			Statement newThenStatement= ast.newBlock();
+			// set new nodes
+			rewrite.set(ifStatement, IfStatement.EXPRESSION_PROPERTY, inversedExpression, null);
+			rewrite.set(ifStatement, IfStatement.THEN_STATEMENT_PROPERTY, newThenStatement, null);
+
+			ListRewrite listRewriter= rewrite.getListRewrite(ifStatement.getParent(), (ChildListPropertyDescriptor)ifStatement.getLocationInParent());
+			for (int i= statements.size() - 1; i >= 0; i--) {
+				Statement statement= statements.get(i);
+				listRewriter.insertAfter(rewrite.createMoveTarget(statement), ifStatement, null);
+			}
 		}
-		rewrite.set(ifStatement, IfStatement.THEN_STATEMENT_PROPERTY, newThenStatement, null);
-		rewrite.set(ifStatement, IfStatement.ELSE_STATEMENT_PROPERTY, newElseStatement, null);
+
 		// add correction proposal
 		String label= CorrectionMessages.AdvancedQuickAssistProcessor_inverseIf_description;
+		Image image= JavaPluginImages.get(JavaPluginImages.IMG_CORRECTION_CHANGE);
+		ASTRewriteCorrectionProposal proposal= new ASTRewriteCorrectionProposal(label, context.getCompilationUnit(), rewrite, 1, image);
+		resultingCollections.add(proposal);
+		return true;
+	}
+
+	private static boolean getReturnQuicklyFromIfProposals(IInvocationContext context, ASTNode covering, Collection<ICommandAccess> resultingCollections) {
+		if (!(covering instanceof IfStatement)) {
+			return false;
+		}
+		IfStatement ifStatement= (IfStatement)covering;
+		if (ifStatement.getElseStatement() != null) {
+			return false;
+		}
+
+		Statement thenStatement= ifStatement.getThenStatement();
+		if (!(thenStatement instanceof Block))
+			return false;
+
+		Block block= (Block)thenStatement;
+		List<Statement> statements= block.statements();
+		List<Statement> statementsToMove= new ArrayList<Statement>();
+		Statement lastStatement= null;
+		for (Iterator<Statement> iterator= statements.iterator(); iterator.hasNext();) {
+			Object next= iterator.next();
+			if (next == null) {
+				statementsToMove.remove(statementsToMove.size() - 1);
+				break;
+			}
+			lastStatement= (Statement)next;
+			statementsToMove.add(0, lastStatement);
+		}
+
+		if (!(lastStatement instanceof ReturnStatement))
+			return false;
+
+		ReturnStatement returnStatement= (ReturnStatement)lastStatement;
+		if (returnStatement.getExpression() != null)
+			return false;
+
+		//  we could produce quick assist
+		if (resultingCollections == null) {
+			return true;
+		}
+
+		AST ast= covering.getAST();
+		ASTRewrite rewrite= ASTRewrite.create(ast);
+
+		// write the statements
+		ListRewrite listRewriter= rewrite.getListRewrite(ifStatement.getParent(), (ChildListPropertyDescriptor)ifStatement.getLocationInParent());
+		for (Iterator<Statement> iter= statementsToMove.iterator(); iter.hasNext();) {
+			Statement statement= iter.next();
+			listRewriter.insertAfter(rewrite.createMoveTarget(statement), ifStatement, null);
+		}
+
+		Expression inversedExpression= getInversedExpression(rewrite, ifStatement.getExpression());
+		Statement newThenStatement= (Statement)rewrite.createMoveTarget(returnStatement);
+		// set new nodes
+		rewrite.set(ifStatement, IfStatement.EXPRESSION_PROPERTY, inversedExpression, null);
+		rewrite.set(ifStatement, IfStatement.THEN_STATEMENT_PROPERTY, newThenStatement, null);
+
+		// add correction proposal
+		String label= CorrectionMessages.AdvancedQuickAssistProcessor_inverseIf_description + "_OLD"; //$NON-NLS-1$
 		Image image= JavaPluginImages.get(JavaPluginImages.IMG_CORRECTION_CHANGE);
 		ASTRewriteCorrectionProposal proposal= new ASTRewriteCorrectionProposal(label, context.getCompilationUnit(), rewrite, 1, image);
 		resultingCollections.add(proposal);

@@ -75,7 +75,6 @@ public class CodeCompletionPerformanceTest extends TextPerformanceTestCase {
 
 	private static final int ACC_COMPLETION= 150;
 	private static final int ACC_APPLICATION= 20;
-	private static final int ACC_PARAMETER_APPLICATION= 20;
 
 	private ICompilationUnit fCU;
 	private String fContents;
@@ -195,16 +194,20 @@ public class CodeCompletionPerformanceTest extends TextPerformanceTestCase {
 			CompletionProposalCollector collector= createCollector();
 			IJavaCompletionProposal[] proposals= codeComplete(collector);
 
-			meter.start();
-			for (int accumulated= 0; accumulated < ACC_APPLICATION; accumulated++) {
-
-				applyProposal(proposals[0]);
-				applyProposal(proposals[2]);
-				applyProposal(proposals[9]);
-
-			}
-			meter.stop();
+			measureApplication(meter, proposals);
 		}
+	}
+
+	private void measureApplication(PerformanceMeter meter, IJavaCompletionProposal[] proposals) {
+		meter.start();
+		for (int accumulated= 0; accumulated < ACC_APPLICATION; accumulated++) {
+
+			applyProposal(proposals[0]);
+			applyProposal(proposals[2]);
+			applyProposal(proposals[9]);
+
+		}
+		meter.stop();
 	}
 
 	private CompletionProposalCollector createCollector() {
@@ -249,15 +252,7 @@ public class CodeCompletionPerformanceTest extends TextPerformanceTestCase {
 			collector.setIgnored(CompletionProposal.METHOD_REF, false);
 			IJavaCompletionProposal[] proposals= codeComplete(collector);
 
-			meter.start();
-
-			for (int accumulated= 0; accumulated < ACC_APPLICATION; accumulated++) {
-				applyProposal(proposals[0]);
-				applyProposal(proposals[2]);
-				applyProposal(proposals[9]);
-			}
-
-			meter.stop();
+			measureApplication(meter, proposals);
 		}
 	}
 
@@ -273,18 +268,7 @@ public class CodeCompletionPerformanceTest extends TextPerformanceTestCase {
 		IPreferenceStore store= JavaPlugin.getDefault().getPreferenceStore();
 		store.setValue(PreferenceConstants.CODEASSIST_GUESS_METHOD_ARGUMENTS, true);
 
-		for (int run= 0; run < runs; run++) {
-			meter.start();
-
-			for (int accumulated= 0; accumulated < ACC_COMPLETION; accumulated++) {
-				CompletionProposalCollector collector= new FillArgumentNamesCompletionProposalCollector(createContext());
-				collector.setIgnored(CompletionProposal.METHOD_REF, false);
-				codeComplete(collector);
-			}
-
-			meter.stop();
-		}
-
+		measureCompletionWithParamterNames(meter, runs);
 	}
 
 	public void testApplicationWithParamterGuesses() throws Exception {
@@ -299,22 +283,7 @@ public class CodeCompletionPerformanceTest extends TextPerformanceTestCase {
 		IPreferenceStore store= JavaPlugin.getDefault().getPreferenceStore();
 		store.setValue(PreferenceConstants.CODEASSIST_GUESS_METHOD_ARGUMENTS, true);
 
-		for (int run= 0; run < runs; run++) {
-			CompletionProposalCollector collector= new FillArgumentNamesCompletionProposalCollector(createContext());
-			collector.setIgnored(CompletionProposal.METHOD_REF, false);
-			IJavaCompletionProposal[] proposals= codeComplete(collector);
-
-			meter.start();
-
-			for (int accumulated= 0; accumulated < ACC_PARAMETER_APPLICATION; accumulated++) {
-				applyProposal(proposals[0]);
-				applyProposal(proposals[2]);
-				applyProposal(proposals[9]);
-			}
-
-			meter.stop();
-		}
-
+		measureApplicationWithParamterNames(meter, runs);
 	}
 
 	public void testCompletionWithParamterGuesses2() throws Exception {
@@ -385,6 +354,5 @@ public class CodeCompletionPerformanceTest extends TextPerformanceTestCase {
 	private JavaContentAssistInvocationContext createContext() {
 		return new JavaContentAssistInvocationContext(fEditor.getViewer(), fCodeAssistOffset, fEditor);
 	}
-
 
 }

@@ -16,9 +16,6 @@ Export-Package:
  org.eclipse.jdt.text.tests.templates
 Require-Bundle: 
  org.eclipse.core.runtime;bundle-version="[3.7.0,4.0.0)",
- org.eclipse.compare.core;bundle-version="[3.5.0,4.0.0)",
- org.eclipse.core.filesystem;bundle-version="[1.2.0,2.0.0)",
- org.eclipse.core.resources;bundle-version="[3.5.0,4.0.0)";resolution:=optional,
  org.eclipse.jface.text;bundle-version="[3.5.0,4.0.0)",
  org.eclipse.ui.workbench.texteditor;bundle-version="[3.5.0,4.0.0)",
  org.eclipse.ui.editors;bundle-version="[3.5.0,4.0.0)",
