@@ -400,9 +400,25 @@ public class JdtActionConstants {
 	public static final String EXTRACT_METHOD= "org.eclipse.jdt.ui.actions.ExtractMethod"; //$NON-NLS-1$
 
 	/**
-	 * Refactor menu: name of standard Replace Invocations global action
-	 * (value <code>"org.eclipse.jdt.ui.actions.ReplaceInvocations"</code>).
-	 *
+	 * Refactor menu: name of standard Find Duplicates global action (value
+	 * <code>"org.eclipse.jdt.ui.actions.FindDuplicates"</code>).
+	 * 
+	 * @since 3.8
+	 */
+	public static final String FIND_DUPLICATES= "org.eclipse.jdt.ui.actions.FindDuplicates"; //$NON-NLS-1$
+
+	/**
+	 * Refactor menu: name of standard Search snippet global action (value
+	 * <code>"org.eclipse.jdt.ui.actions.SearchSnippet"</code>).
+	 * 
+	 * @since 3.8
+	 */
+	public static final String SEARCH_SNIPPET= "org.eclipse.jdt.ui.actions.SearchSnippet"; //$NON-NLS-1$
+
+	/**
+	 * Refactor menu: name of standard Replace Invocations global action (value
+	 * <code>"org.eclipse.jdt.ui.actions.ReplaceInvocations"</code>).
+	 * 
 	 * @since 3.2
 	 */
 	public static final String REPLACE_INVOCATIONS="org.eclipse.jdt.ui.actions.ReplaceInvocations"; //$NON-NLS-1$
